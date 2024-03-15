@@ -16,7 +16,7 @@
 #define SCORE_CACHE_COLLISION_RETRIES 20 // number of retries to find entry in cache in case of hash collision
 
 // Number of ticks to from prior epoch that are kept after seamless epoch transition. These can be requested after transition.
-#define TICKS_TO_KEEP_FROM_PRIOR_EPOCH 100
+#define TICKS_TO_KEEP_FROM_PRIOR_EPOCH 300
 
 #define TARGET_TICK_DURATION 2500
 #define TRANSACTION_SPARSENESS 4
@@ -31,7 +31,7 @@
 
 #define VERSION_A 1
 #define VERSION_B 196
-#define VERSION_C 2
+#define VERSION_C 3
 
 #define EPOCH 100
 #define TICK 12950000
