@@ -2195,6 +2195,9 @@ static void processTick(unsigned long long processorNumber)
                                                 minerSolutionFlags[flagIndex >> 6] |= (1ULL << (flagIndex & 63));
 
                                                 unsigned long long solutionScore = (*::score)(processorNumber, transaction->sourcePublicKey, solution_nonce);
+#if !defined(NDEBUG)
+                                                addDebugMessageAndWait(L"processTick(): solutionScore computed");
+#endif
 
                                                 resourceTestingDigest ^= solutionScore;
                                                 KangarooTwelve(&resourceTestingDigest, sizeof(resourceTestingDigest), &resourceTestingDigest, sizeof(resourceTestingDigest));
@@ -2202,6 +2205,9 @@ static void processTick(unsigned long long processorNumber)
                                                 const int threshold = (system.epoch < MAX_NUMBER_EPOCH) ? solutionThreshold[system.epoch] : SOLUTION_THRESHOLD_DEFAULT;
                                                 if (((solutionScore >= (DATA_LENGTH / 2) + threshold) || (solutionScore <= (DATA_LENGTH / 2) - threshold)))
                                                 {
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"solutionScore okay");
+#endif
                                                     for (unsigned int i = 0; i < sizeof(computorSeeds) / sizeof(computorSeeds[0]); i++)
                                                     {
                                                         if (transaction->sourcePublicKey == computorPublicKeys[i])
@@ -2232,6 +2238,9 @@ static void processTick(unsigned long long processorNumber)
                                                             break;
                                                         }
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"1");
+#endif
 
                                                     unsigned int minerIndex;
                                                     for (minerIndex = 0; minerIndex < numberOfMiners; minerIndex++)
@@ -2243,12 +2252,18 @@ static void processTick(unsigned long long processorNumber)
                                                             break;
                                                         }
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"2");
+#endif
                                                     if (minerIndex == numberOfMiners
                                                         && numberOfMiners < MAX_NUMBER_OF_MINERS)
                                                     {
                                                         minerPublicKeys[numberOfMiners] = transaction->sourcePublicKey;
                                                         minerScores[numberOfMiners++] = 1;
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"3");
+#endif
 
                                                     const m256i tmpPublicKey = minerPublicKeys[minerIndex];
                                                     const unsigned int tmpScore = minerScores[minerIndex];
@@ -2260,6 +2275,9 @@ static void processTick(unsigned long long processorNumber)
                                                         minerPublicKeys[--minerIndex] = tmpPublicKey;
                                                         minerScores[minerIndex] = tmpScore;
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"4");
+#endif
 
                                                     // combine 225 worst current computors with 225 best candidates
                                                     for (unsigned int i = 0; i < NUMBER_OF_COMPUTORS - QUORUM; i++)
@@ -2279,6 +2297,9 @@ static void processTick(unsigned long long processorNumber)
                                                         }
                                                         competitorComputorStatuses[i + (NUMBER_OF_COMPUTORS - QUORUM)] = false;
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"5");
+#endif
 
                                                     // bubble sorting -> top 225 from competitorPublicKeys have computors and candidates which are the best from that subset
                                                     for (unsigned int i = NUMBER_OF_COMPUTORS - QUORUM; i < (NUMBER_OF_COMPUTORS - QUORUM) * 2; i++)
@@ -2298,6 +2319,9 @@ static void processTick(unsigned long long processorNumber)
                                                             competitorComputorStatuses[j] = tmpComputorStatus;
                                                         }
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"6");
+#endif
 
                                                     minimumComputorScore = competitorScores[NUMBER_OF_COMPUTORS - QUORUM - 1];
 
@@ -2314,6 +2338,9 @@ static void processTick(unsigned long long processorNumber)
                                                     {
                                                         minimumCandidateScore = minimumComputorScore;
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"7");
+#endif
 
                                                     for (unsigned int i = 0; i < QUORUM; i++)
                                                     {
@@ -2323,6 +2350,9 @@ static void processTick(unsigned long long processorNumber)
                                                     {
                                                         system.futureComputors[i] = competitorPublicKeys[i - QUORUM];
                                                     }
+#if !defined(NDEBUG)
+                                                    addDebugMessageAndWait(L"system.futureComputors set");
+#endif
                                                 }
                                             }
                                             else

@@ -103,6 +103,16 @@ static void addDebugMessage(const CHAR16* msg)
     RELEASE(debugLogLock);
 }
 
+// Add a message for logging from non-main thread and wait until printDebugMessages() has finished
+static void addDebugMessageAndWait(const CHAR16* msg)
+{
+    addDebugMessage(msg);
+    while (debugMessageCount > 0)
+    {
+        _mm_pause();
+    }
+}
+
 // Add a assert message for logging from arbitrary thread
 static void addDebugMessageAssert(const CHAR16* message, const CHAR16* file, const unsigned int lineNumber)
 {
