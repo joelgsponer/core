@@ -18,7 +18,7 @@
 // Number of ticks to from prior epoch that are kept after seamless epoch transition. These can be requested after transition.
 #define TICKS_TO_KEEP_FROM_PRIOR_EPOCH 300
 
-#define TARGET_TICK_DURATION 2500
+#define TARGET_TICK_DURATION 7000
 #define TRANSACTION_SPARSENESS 4
 
 // Set START_NETWORK_FROM_SCRATCH to 0 if you start the node for syncing with the already ticking network.
