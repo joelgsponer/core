@@ -4565,7 +4565,7 @@ static void processKeyPresses()
         */
         case 0x0E:
         {
-            logToConsole("Pressed F4 key");
+            logToConsole(L"Pressed F4 key");
             for (unsigned int i = 0; i < NUMBER_OF_OUTGOING_CONNECTIONS + NUMBER_OF_INCOMING_CONNECTIONS; i++)
             {
                 closePeer(&peers[i]);
@@ -4580,7 +4580,7 @@ static void processKeyPresses()
         */
         case 0x0F:
         {
-            logToConsole("Pressed F5 key");
+            logToConsole(L"Pressed F5 key");
             forceNextTick = true;
         }
         break;
@@ -4592,7 +4592,7 @@ static void processKeyPresses()
         */
         case 0x10:
         {
-            logToConsole("Pressed F6 key");
+            logToConsole(L"Pressed F6 key");
             SPECTRUM_FILE_NAME[sizeof(SPECTRUM_FILE_NAME) / sizeof(SPECTRUM_FILE_NAME[0]) - 4] = L'0';
             SPECTRUM_FILE_NAME[sizeof(SPECTRUM_FILE_NAME) / sizeof(SPECTRUM_FILE_NAME[0]) - 3] = L'0';
             SPECTRUM_FILE_NAME[sizeof(SPECTRUM_FILE_NAME) / sizeof(SPECTRUM_FILE_NAME[0]) - 2] = L'0';
@@ -4618,7 +4618,7 @@ static void processKeyPresses()
         */
         case 0x11:
         {
-            logToConsole("Pressed F7 key");
+            logToConsole(L"Pressed F7 key");
             forceSwitchEpoch = true;
         }
         break;
@@ -4630,7 +4630,7 @@ static void processKeyPresses()
         */
         case 0x13:
         {
-            logToConsole("Pressed F9 key");
+            logToConsole(L"Pressed F9 key");
             if (system.latestCreatedTick > 0) system.latestCreatedTick--;
         }
         break;
