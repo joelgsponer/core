@@ -30,11 +30,11 @@
 // Config options that should NOT be changed by operators
 
 #define VERSION_A 1
-#define VERSION_B 196
-#define VERSION_C 3
+#define VERSION_B 197
+#define VERSION_C 4
 
-#define EPOCH 100
-#define TICK 12950000
+#define EPOCH 101
+#define TICK 13000000
 
 // random seed is now obtained from spectrumDigests
 
