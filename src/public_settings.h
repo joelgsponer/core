@@ -4,8 +4,8 @@
 
 // no need to define AVX512 here anymore, just change the project settings to use the AVX512 version
 
-#define MAX_NUMBER_OF_PROCESSORS 32
-#define NUMBER_OF_SOLUTION_PROCESSORS 6 // do not increase this for this epoch, because there may be issues due too fast ticking
+#define MAX_NUMBER_OF_PROCESSORS 64
+#define NUMBER_OF_SOLUTION_PROCESSORS 32 // do not increase this for this epoch, because there may be issues due too fast ticking
 
 #define VERSION_A 1
 #define VERSION_B 196
