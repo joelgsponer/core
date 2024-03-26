@@ -39,10 +39,12 @@ struct ScoreFunction
     // _totalModNum[i]: total of divisible numbers of i
     int _totalModNum[257];
     // i is divisible by _modNum[i][j], j < _totalModNum[i]
-    int _modNum[257][128];
+    int _modNum[257][129];
     // indice pos
     unsigned short _indicePosInput[solutionBufferCount][numberOfInputNeurons + infoLength][dataLength + numberOfInputNeurons + infoLength];
     unsigned short _indicePosOutput[solutionBufferCount][numberOfOutputNeurons + dataLength][infoLength + numberOfOutputNeurons + dataLength];
+    
+    int nSample;
 
     int _bucketPosInput[solutionBufferCount][numberOfInputNeurons + infoLength][129];
     int _bufferPosInput[solutionBufferCount][numberOfInputNeurons + infoLength][129];
@@ -80,6 +82,7 @@ struct ScoreFunction
                 }
             }
         }
+        nSample = 8;
     }
 
     // Save score cache to SCORE_CACHE_FILE_NAME
@@ -109,14 +112,114 @@ struct ScoreFunction
         return (a < 0) ? -a : a;
     }
 
-    static inline void clampNeuron(long long& val)
+    void clampNeuron(long long& val)
     {
-        if (val >= NEURON_VALUE_LIMIT) {
-            val = NEURON_VALUE_LIMIT - 1;
+        if (val > NEURON_VALUE_LIMIT) {
+            val = NEURON_VALUE_LIMIT;
         }
         else if (val < -NEURON_VALUE_LIMIT) {
             val = -NEURON_VALUE_LIMIT;
         }
+    }
+
+    void merge(const unsigned short* A, const unsigned short* B, unsigned short* C, const unsigned short lenA, const unsigned short lenB)
+    {
+        unsigned short lA = 0, lB = 0;
+        int count = 0;
+        while (lA < lenA && lB < lenB) {
+            if (A[lA] < B[lB]) {
+                C[count++] = A[lA++];
+            }
+            else { //guarantee unique
+                C[count++] = B[lB++];
+            }
+        }
+        while (lA < lenA) C[count++] = A[lA++];
+        while (lB < lenB) C[count++] = B[lB++];
+    }
+
+    int mergeSortBucket(unsigned short* indices, const int* bucket, const int* modNum, unsigned short* output, unsigned short* buffer, const int totalModNum)
+    {
+        if (totalModNum == 1) {
+            int mod = modNum[0];
+            int start = bucket[mod];
+            int len = bucket[mod + 1] - start;
+            copyMem(output, indices + start, len * sizeof(unsigned short));
+            return len;
+        }
+        if (totalModNum == 2) {
+            int mod = modNum[0];
+            int start = bucket[mod];
+            unsigned short* seg0 = indices + start;
+            unsigned short len0 = bucket[mod + 1] - start;
+
+            mod = modNum[1];
+            start = bucket[mod];
+            unsigned short* seg1 = indices + start;
+            unsigned short len1 = bucket[mod + 1] - start;
+
+            merge(seg0, seg1, output, len0, len1);
+            return len0 + len1;
+        }
+        // max depth = 5
+        // it is guaranteed that there is no more than 32 segments if tick <= 256
+        static_assert(MAX_INPUT_DURATION <= 256 && MAX_OUTPUT_DURATION <= 256, "Need to increase seg count");
+        unsigned short* seg0_buffer[32];
+        unsigned short* seg1_buffer[32];
+        unsigned short len0_buffer[32];
+        unsigned short len1_buffer[32];
+        setMem(seg0_buffer, sizeof(seg0_buffer), 0);
+        setMem(seg1_buffer, sizeof(seg1_buffer), 0);
+        setMem(len0_buffer, sizeof(len0_buffer), 0);
+        setMem(len1_buffer, sizeof(len1_buffer), 0);
+
+        unsigned short** seg0 = seg0_buffer;
+        unsigned short** seg1 = seg1_buffer;
+        unsigned short* len0 = len0_buffer;
+        unsigned short* len1 = len1_buffer;
+        for (int i = 0; i < totalModNum; i++) {
+            int mod = modNum[i];
+            int start = bucket[mod];
+            seg0[i] = indices + start;
+            len0[i] = bucket[mod + 1] - start;
+        }
+
+        int nSegment = totalModNum;
+        for (int depth = 0; depth < 5; depth++) {
+            int newSegCount = 0;
+            for (int i = 0; i < nSegment; i += 2) {
+                if (i + 1 == nSegment) {
+                    seg1[newSegCount] = seg0[i];
+                    len1[newSegCount] = len0[i];
+                    newSegCount++;
+                    continue;
+                }
+                seg1[newSegCount] = buffer;
+                merge(seg0[i], seg0[i + 1], seg1[newSegCount], len0[i], len0[i + 1]);
+                len1[newSegCount] = len0[i] + len0[i + 1];
+                buffer += len1[newSegCount];
+                newSegCount++;
+            }
+            {
+                //swap ptr
+                unsigned short ** tmp = seg0;
+                seg0 = seg1;
+                seg1 = tmp;
+            }
+            {
+                unsigned short * tmp = len0;
+                len0 = len1;
+                len1 = tmp;
+            }
+            nSegment = newSegCount;
+            if (newSegCount <= 1) { // guaranteed will end up here
+                if (len0[0]) {
+                    copyMem(output, seg0[0], len0[0] * sizeof(output[0]));
+                }
+                return len0[0];
+            }
+        }
+        return -1;
     }
 
     void generateSynapse(int solutionBufIdx, const m256i& publicKey, const m256i& nonce)
@@ -153,6 +256,33 @@ struct ScoreFunction
         for (unsigned int outputNeuronIndex = 0; outputNeuronIndex < numberOfOutputNeurons + dataLength; outputNeuronIndex++)
         {
             synapses.outputLength[outputNeuronIndex * (infoLength + numberOfOutputNeurons + dataLength) + (infoLength + outputNeuronIndex)] = 0;
+        }
+    }
+
+    void getLastNeurons(const unsigned short* indices, const int* bucket, const int* modNum, unsigned short* topMax,
+                        const int nMax, const int totalModNum, int& currentCount, long long* neuron)
+    {
+        int index[64];
+        static_assert(MAX_INPUT_DURATION <= 256 && MAX_OUTPUT_DURATION <= 256, "Need to increase array length");
+        setMem(index, sizeof(index), 0);
+        while (currentCount < nMax)
+        {
+            int current_max = -1;
+            int max_id = -1;
+            for (int i = 0; i < totalModNum; i++) {
+                int mod = modNum[i];
+                int start = bucket[mod];
+                int end = bucket[mod + 1];
+                if (start + index[i] < end) {
+                    if (indices[end - index[i] - 1] > current_max) {
+                        current_max = indices[end - index[i] - 1];
+                        max_id = i;
+                    }
+                }
+            }
+            if (current_max == -1) return;
+            if (neuron[current_max]) topMax[currentCount++] = current_max;
+            index[max_id]++;
         }
     }
 
@@ -209,29 +339,14 @@ struct ScoreFunction
         int totalIndice;
         for (int tick = 1; tick <= maxInputDuration; tick++) {
             for (unsigned int inputNeuronIndex = 0; inputNeuronIndex < numberOfInputNeurons + infoLength; inputNeuronIndex++) {
+                // pre scan for shortcut
+                if (tick > 3)
                 {
-                    totalIndice = 0;
-                    for (int i = 0; i < _totalModNum[tick]; i++) {
-                        int mod = _modNum[tick][i];
-                        int start = bucketPosInput[inputNeuronIndex][mod];
-                        int end = bucketPosInput[inputNeuronIndex][mod + 1];
-                        if (end - start > 0) {
-                            copyMem(indices + totalIndice, indicePosInput[inputNeuronIndex] + start, sizeof(unsigned short) * (end - start));
-                            totalIndice += end - start;
-                        }
-                    }
-
-                    for (int i = 1; i < totalIndice; i++) {
-                        unsigned short key = indices[i];
-                        int j = i - 1;
-                        while (j >= 0 && indices[j] > key) {
-                            indices[j + 1] = indices[j];
-                            j = j - 1;
-                        }
-                        indices[j + 1] = key;
-                    }
-
-                    for (int i = 0; i < totalIndice; i++) {
+                    int elemCount = 0;
+                    getLastNeurons(indicePosInput[inputNeuronIndex], bucketPosInput[inputNeuronIndex], _modNum[tick], indices,
+                        nSample, _totalModNum[tick], elemCount, neurons.input);
+                    for (int i = 0; i < elemCount; i++)
+                    {
                         unsigned int anotherInputNeuronIndex = indices[i];
                         const unsigned int offset = inputNeuronIndex * (dataLength + numberOfInputNeurons + infoLength) + anotherInputNeuronIndex;
                         if (synapses.inputLength[offset] > 0) {
@@ -241,11 +356,46 @@ struct ScoreFunction
                             sumBuffer[i] = -neurons.input[anotherInputNeuronIndex];
                         }
                     }
-                    for (int i = 0; i < totalIndice; i++)
+                    int found = -1;
+                    long long s = 0;
+                    for (int i = 0; i < elemCount - 1; i++)
                     {
-                        neurons.input[dataLength + inputNeuronIndex] += sumBuffer[i];
-                        clampNeuron(neurons.input[dataLength + inputNeuronIndex]);
+                        if ((sumBuffer[i] > 0) == (sumBuffer[i + 1] > 0))
+                        {
+                            found = i + 1;
+                            break;
+                        }
                     }
+                    if (found != -1)
+                    {
+                        s = 0;
+                        for (int i = found; i >= 0; i--)
+                        {
+                            s += sumBuffer[i];
+                            clampNeuron(s);
+                        }
+                        neurons.input[dataLength + inputNeuronIndex] = s;
+                        continue;
+                    }
+                }
+                // full compute
+                totalIndice = mergeSortBucket(indicePosInput[inputNeuronIndex], bucketPosInput[inputNeuronIndex], _modNum[tick], indices, (unsigned short*)sumBuffer, _totalModNum[tick]);
+                if (totalIndice == 0) continue;
+
+                for (int i = 0; i < totalIndice; i++) {
+                    unsigned int anotherInputNeuronIndex = indices[i];
+                    const unsigned int offset = inputNeuronIndex * (dataLength + numberOfInputNeurons + infoLength) + anotherInputNeuronIndex;
+                    if (synapses.inputLength[offset] > 0) {
+                        sumBuffer[i] = neurons.input[anotherInputNeuronIndex];
+                    }
+                    else {
+                        sumBuffer[i] = -neurons.input[anotherInputNeuronIndex];
+                    }
+                }
+                for (int i = 0; i < totalIndice; i++)
+                {
+                    neurons.input[dataLength + inputNeuronIndex] += sumBuffer[i];
+                    clampNeuron(neurons.input[dataLength + inputNeuronIndex]);
                 }
             }
         }
@@ -303,27 +453,48 @@ struct ScoreFunction
         int totalIndice;
         for (int tick = 1; tick <= maxOutputDuration; tick++) {
             for (unsigned int outputNeuronIndex = 0; outputNeuronIndex < numberOfOutputNeurons + dataLength; outputNeuronIndex++) {
+                // pre scan for shortcut
+                if (tick > 3)
                 {
-                    totalIndice = 0;
-                    for (int i = 0; i < _totalModNum[tick]; i++) {
-                        int mod = _modNum[tick][i];
-                        int start = bucketPosOutput[outputNeuronIndex][mod];
-                        int end = bucketPosOutput[outputNeuronIndex][mod + 1];
-                        if (end - start > 0) {
-                            copyMem(indices + totalIndice, indicePosOutput[outputNeuronIndex] + start, sizeof(unsigned short) * (end - start));
-                            totalIndice += end - start;
+                    int elemCount = 0;
+                    getLastNeurons(indicePosOutput[outputNeuronIndex], bucketPosOutput[outputNeuronIndex], _modNum[tick], indices,
+                        nSample, _totalModNum[tick], elemCount, neurons.output);
+                    for (int i = 0; i < elemCount; i++)
+                    {
+                        unsigned int anotherOutputNeuronIndex = indices[i];
+                        const unsigned int offset = outputNeuronIndex * (dataLength + numberOfOutputNeurons + infoLength) + anotherOutputNeuronIndex;
+                        if (synapses.outputLength[offset] > 0) {
+                            sumBuffer[i] = neurons.output[anotherOutputNeuronIndex];
+                        }
+                        else {
+                            sumBuffer[i] = -neurons.output[anotherOutputNeuronIndex];
                         }
                     }
-
-                    for (int i = 1; i < totalIndice; i++) {
-                        unsigned short key = indices[i];
-                        int j = i - 1;
-                        while (j >= 0 && indices[j] > key) {
-                            indices[j + 1] = indices[j];
-                            j = j - 1;
+                    int found = -1;
+                    long long s = 0;
+                    for (int i = 0; i < elemCount - 1; i++)
+                    {
+                        if ((sumBuffer[i] > 0) == (sumBuffer[i + 1] > 0))
+                        {
+                            found = i + 1;
+                            break;
                         }
-                        indices[j + 1] = key;
                     }
+                    if (found != -1)
+                    {
+                        s = 0;
+                        for (int i = found; i >= 0; i--)
+                        {
+                            s += sumBuffer[i];
+                            clampNeuron(s);
+                        }
+                        neurons.output[infoLength + outputNeuronIndex] = s;
+                        continue;
+                    }
+                }
+                {
+                    totalIndice = mergeSortBucket(indicePosOutput[outputNeuronIndex], bucketPosOutput[outputNeuronIndex], _modNum[tick], indices, (unsigned short*)sumBuffer, _totalModNum[tick]);
+                    if (totalIndice == 0) continue;
 
                     for (int i = 0; i < totalIndice; i++) {
                         unsigned int anotherOutputNeuronIndex = indices[i];
