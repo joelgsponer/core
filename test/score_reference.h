@@ -42,8 +42,8 @@ struct ScoreReferenceImplementation
 
     static inline void clampNeuron(long long& val)
     {
-        if (val >= NEURON_VALUE_LIMIT) {
-            val = NEURON_VALUE_LIMIT - 1;
+        if (val > NEURON_VALUE_LIMIT) {
+            val = NEURON_VALUE_LIMIT;
         }
         else if (val < -NEURON_VALUE_LIMIT) {
             val = -NEURON_VALUE_LIMIT;
@@ -147,7 +147,7 @@ struct ScoreReferenceImplementation
 
         for (unsigned int i = 0; i < dataLength; i++)
         {
-            if ((miningData[i] >= 0) == (neurons.output[infoLength + numberOfOutputNeurons + i] >= 0))
+            if (miningData[i] == neurons.output[infoLength + numberOfOutputNeurons + i])
             {
                 score++;
             }
