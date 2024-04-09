@@ -9,7 +9,7 @@
 // random seed is now obtained from spectrumDigests
 
 #define MAX_NUMBER_OF_PROCESSORS 64
-#define NUMBER_OF_SOLUTION_PROCESSORS 32 // do not increase this for this epoch, because there may be issues due too fast ticking
+#define NUMBER_OF_SOLUTION_PROCESSORS 6 // do not increase this for this epoch, because there may be issues due too fast ticking
 
 #define USE_SCORE_CACHE 1
 #define SCORE_CACHE_SIZE 2000000 // the larger the better
